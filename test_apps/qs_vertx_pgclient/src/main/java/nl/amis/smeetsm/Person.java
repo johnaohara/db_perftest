@@ -5,11 +5,6 @@ import io.smallrye.mutiny.Uni;
 import io.vertx.mutiny.pgclient.PgPool;
 import io.vertx.mutiny.sqlclient.Row;
 import io.vertx.mutiny.sqlclient.Tuple;
-import sun.tools.jstat.Literal;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.CompletionStage;
 
 
 public class Person {
@@ -18,6 +13,9 @@ public class Person {
     private String firstName;
     private String lastName;
 
+    public Person() {
+    }
+
     public Person(Long id, String firstName, String lastName) {
         this.id = id;
         this.firstName = firstName;
@@ -25,11 +23,10 @@ public class Person {
     }
 
     public static Uni<Person> findById(PgPool client, Long id) {
-//        return client.preparedQuery("SELECT id, first_name, last_name  FROM person WHERE id = $1", Tuple.of(id))
-//                .(PgRowSet -> {
-//            return PgRowSet.iterator();
-//        }).thenApply(iterator -> iterator.hasNext() ? from(iterator.next()) : null);
-        return null;
+        return client.preparedQuery("SELECT id, first_name, last_name  FROM person WHERE id = $1", Tuple.of(id))
+                .onItem()
+                .produceUni( rows -> Uni.createFrom().item(from(rows.iterator().next())));
+
 
     }
 
@@ -44,28 +41,20 @@ public class Person {
                 .map(row -> from(row));
     }
 
-    public static void findAllTest(PgPool client) {
-/*
-        client.preparedQuery("SELECT id, first_name, last_name FROM person")
-                .subscribe().with(
-                rows ->  System.out.println("Got Rows!"),
-                failure -> failure.printStackTrace()
-        );
-*/
 
-
-
-
-        //                .onItem()
-//                .invoke(rows -> System.out.println("Got Rows!")
-//                );
-    }
-
-
-    public static CompletionStage<Boolean> delete(PgPool client, Long id) {
-//        return client.preparedQuery("DELETE FROM person WHERE id = $1", Tuple.of(id))
-//                .thenApply(pgRowSet -> pgRowSet.rowCount() == 1);
-        return null;
+    public static Uni<Boolean> delete(PgPool client, Long id) {
+        return client.begin()
+                .flatMap(tx -> tx
+                        .preparedQuery("DELETE FROM person WHERE id = $1", Tuple.of(id))
+                        .onItem().produceUni(results -> {
+                            tx.commit();
+                            return Uni.createFrom().item(true);
+                        })
+                        .onFailure().recoverWithUni(t -> {
+                            tx.rollback();
+                            return Uni.createFrom().item(false);
+                        })
+                );
     }
 
     public String getFirstName() {
@@ -92,11 +81,18 @@ public class Person {
         this.id = id;
     }
 
-    public CompletionStage<Long> save(PgPool client) {
-//        return client.preparedQuery("INSERT INTO person (first_name,last_name) VALUES ($1,$2) RETURNING (id)", Tuple.of(firstName, lastName))
-//                .thenApply(pgRowSet -> pgRowSet.iterator().next().getLong("id"));
-        return null;
-
+    public Uni<Long> save(PgPool client) {
+        return client.begin().onItem()
+                .produceUni(tx -> tx
+                        .preparedQuery("INSERT INTO person (first_name,last_name) VALUES ($1,$2) RETURNING (id)", Tuple.of(firstName, lastName))
+                        .onItem().produceUni(results -> {
+                            tx.commitAndForget();
+                            return Uni.createFrom().item(results.iterator().next().getLong("id"));
+                        })
+                        .onFailure().recoverWithUni(t -> {
+                            tx.rollbackAndForget();
+                            return Uni.createFrom().nullItem();
+                        }));
     }
 
 }

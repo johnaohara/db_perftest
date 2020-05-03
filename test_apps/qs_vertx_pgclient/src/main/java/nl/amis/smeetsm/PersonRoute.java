@@ -10,6 +10,8 @@ import io.vertx.mutiny.pgclient.PgPool;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.net.URI;
+import java.util.Optional;
 
 @Singleton
 public class PersonRoute {
@@ -23,35 +25,49 @@ public class PersonRoute {
 
         Person.findAll(client)
                 .subscribe()
-                .with(
-                        person -> resultArr.add(JsonObject.mapFrom(person)),
+                .with(person -> resultArr.add(JsonObject.mapFrom(person)),
                         () -> {
                             ex.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json").setStatusCode(200).end(resultArr.toString());
                         }
                 );
-
     }
 
 
-//    @Route(path = "/people", methods = HttpMethod.GET)
-//    public CompletionStage<Response> getSingle(@PathParam("id") Long id) {
-//        return Person.findById(client, id)
-//                .thenApply(person -> person != null ? Response.ok(person) : Response.status(Response.Status.NOT_FOUND))
-//                .thenApply(Response.ResponseBuilder::build);
-//    }
-//
-//    @POST
-//    public CompletionStage<Response> create(Person person) {
-//        return person.save(client)
-//                .thenApply(id -> URI.create("/people/" + id))
-//                .thenApply(uri -> Response.created(uri).build());
-//    }
-//
-//    @DELETE
-//    @Path("{id}")
-//    public CompletionStage<Response> delete(@PathParam("id") Long id) {
-//        return Person.delete(client, id)
-//                .thenApply(deleted -> deleted ? Response.Status.NO_CONTENT : Response.Status.NOT_FOUND)
-//                .thenApply(status -> Response.status(status).build());
-//    }
+    @Route(path = "/people/:id", methods = HttpMethod.GET)
+    void getSingle(final RoutingExchange ex) {
+        Optional<String> id = ex.getParam("id");
+        if (id.isPresent()) {
+            Person.findById(client, Long.valueOf(id.get()))
+                    .subscribe()
+                    .with(person -> ex.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json").setStatusCode(200).end(JsonObject.mapFrom(person).toString()),
+                            failure -> ex.response().setStatusCode(500).end(failure.getMessage())
+                    );
+        } else {
+            ex.response().setStatusCode(400).end();
+        }
+    }
+
+    @Route(path = "/people", methods = HttpMethod.POST)
+    void create(final RoutingExchange ex) {
+        ex.context().getBodyAsJson()
+                .mapTo(Person.class)
+                .save(client)
+                .subscribe()
+                .with(id -> ex.response().setStatusCode(201).end(URI.create("/people/" + id).toString()),
+                        failure -> ex.response().setStatusCode(500).end(failure.getMessage())
+                );
+    }
+
+    @Route(path = "/people", methods = HttpMethod.DELETE)
+    void delete(final RoutingExchange ex) {
+        Optional<String> id = ex.getParam("id");
+        if (id.isPresent()) {
+            Person.delete(client, Long.valueOf(id.get()))
+                    .subscribe()
+                    .with(success -> ex.response().setStatusCode(success ? 204 : 404).end(),
+                            failure -> ex.response().setStatusCode(500).end(failure.getMessage()));
+        } else {
+            ex.response().setStatusCode(400).end();
+        }
+    }
 }
