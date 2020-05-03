@@ -5,8 +5,8 @@ import re
 import signal
 import subprocess
 import time
-import copy
 from datetime import datetime
+import sys, getopt
 
 test_duration = 60
 primer_duration = 2
@@ -14,8 +14,8 @@ wait_after_primer = 1
 wait_to_start = 10
 wait_after_kill = 2
 now = datetime.now()
-javacmd = '/usr/lib/jvm/java-11-openjdk-amd64/bin/java -Xmx2g -Xms2g'
-wrkcmd = '/home/maarten/projects/wrk/wrk'
+javacmd = ''
+wrkcmd = ''
 wrktimeout = '20s'
 
 datestring = now.strftime("%Y%m%d_%H%M%S")
@@ -45,22 +45,32 @@ cpuset_conf2 = ['2,4,6,8']
 concurrency_conf = ['4','50','100','150','200','250','300','350','400','450','500','600','700','800','900','1000']
 
 # JAR files to test with
-jarfiles = [     {'filename': 'sb_jpa_hikari_jdbc-0.0.1-SNAPSHOT.jar',
+jarfiles = [
+    {'filename': '../test_apps/sb_jpa_hikari_jdbc/target/sb_jpa_hikari_jdbc-0.0.1-SNAPSHOT.jar',
                   'description': 'Web MVC JDBC',
                   'asyncservice': 'no',
                   'asyncdriver': 'no'},
-                 {'filename': 'sb_webflux_r2dbcpool_r2dbc-0.0.1-SNAPSHOT.jar',
+                 {'filename': '../test_apps/sb_webflux_r2dbcpool_r2dbc/target/sb_webflux_r2dbcpool_r2dbc-0.0.1-SNAPSHOT.jar',
                   'description': 'WebFlux R2DBC',
                   'asyncservice': 'yes',
                   'asyncdriver': 'yes'},
-                 {'filename': 'sb_jpa_r2dbcpool_r2dbc-0.0.1-SNAPSHOT.jar',
+                 {'filename': '../test_apps/sb_jpa_r2dbcpool_r2dbc/target/sb_jpa_r2dbcpool_r2dbc-0.0.1-SNAPSHOT.jar',
                   'description': 'Web MVC R2DBC',
                   'asyncservice': 'no',
                   'asyncdriver': 'yes'},
-                 {'filename': 'sb_webflux_jpa_hikari_jdbc-0.0.1-SNAPSHOT.jar',
+                 {'filename': '../test_apps/sb_webflux_jpa_hikari_jdbc/target/sb_webflux_jpa_hikari_jdbc-0.0.1-SNAPSHOT.jar',
                   'description': 'WebFlux JDBC',
                   'asyncservice': 'yes',
-                  'asyncdriver': 'no'}]
+                  'asyncdriver': 'no'},
+                 {'filename': '../test_apps/qs_vertx_pgclient/target/qs_vertx_pgclient-1.0-SNAPSHOT-runner.jar',
+                  'description': 'Vert.x-web PgPool',
+                  'asyncservice': 'yes',
+                  'asyncdriver': 'yes'},
+                 {'filename': '../test_apps/qs_resteasy_panache_jpa/target/qs_resteasy_panache_jpa-1.0-SNAPSHOT-runner.jar',
+                  'description': 'Quarkus Panache JPA',
+                  'asyncservice': 'no',
+                  'asyncdriver': 'no'}
+                 ]
 
 def check_prereqs():
     resval = True;
@@ -394,7 +404,25 @@ def kill_process(pid):
     return
 
 
-def main():
+def main(argv):
+    global javacmd
+    global wrkcmd
+    try:
+        opts, args = getopt.getopt(argv,"hi:o:",["jfile=","wfile="])
+    except getopt.GetoptError:
+        print ('test.py -j <javacmd> -w <wrkcmd>')
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-h':
+            print ('test.py -j <javacmd> -w <wrkcmd>')
+            sys.exit()
+        elif opt in ("-j", "--jfile"):
+            javacmd = arg
+        elif opt in ("-w", "--wfile"):
+            wrkcmd = arg
+    print ('Java Cmd is: "', javacmd, '"')
+    print ('Wrk Cmd is: "', wrkcmd, '"')
+
     if (not check_prereqs()):
         logger.error('Prerequisites not satisfied. Exiting')
         exit(1)
@@ -405,4 +433,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv[1:])
