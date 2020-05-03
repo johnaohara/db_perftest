@@ -27,13 +27,11 @@ public class Person {
                 .onItem()
                 .produceUni( rows -> {
                     if (rows.iterator().hasNext()) {
-                        return Uni.createFrom().item(from(rows.iterator().next()));
+                        return Uni.createFrom().item(Person.from(rows.iterator().next()));
                     } else {
                         return Uni.createFrom().failure(new Throwable("Person not found with id: ".concat(id.toString())));
                     }
                 });
-
-
     }
 
     private static Person from(Row row) {

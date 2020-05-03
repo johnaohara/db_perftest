@@ -37,11 +37,15 @@ public class PersonRoute {
     void getSingle(final RoutingExchange ex) {
         Optional<String> id = ex.getParam("id");
         if (id.isPresent()) {
-            Person.findById(client, Long.valueOf(id.get()))
-                    .subscribe()
-                    .with(person -> ex.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json").setStatusCode(200).end(JsonObject.mapFrom(person).toString()),
-                            failure -> ex.response().setStatusCode(404).end(failure.getMessage())
-                    );
+            try {
+                Person.findById(client, Long.valueOf(id.get()))
+                        .subscribe()
+                        .with(person -> ex.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json").setStatusCode(200).end(JsonObject.mapFrom(person).toString()),
+                                failure -> ex.response().setStatusCode(404).end(failure.getMessage())
+                        );
+            } catch (NumberFormatException nfe){
+                ex.response().setStatusCode(400).end();
+            }
         } else {
             ex.response().setStatusCode(400).end();
         }
