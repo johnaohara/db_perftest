@@ -44,7 +44,7 @@ public class Person {
         return client.query("SELECT id, first_name, last_name FROM person")
                 .onItem()
                 .produceMulti(rows -> Multi.createFrom().iterable(rows))
-                .map(row -> from(row));
+                .map(Person::from);
     }
 
 
@@ -53,11 +53,11 @@ public class Person {
                 .flatMap(tx -> tx
                         .preparedQuery("DELETE FROM person WHERE id = $1", Tuple.of(id))
                         .onItem().produceUni(results -> {
-                            tx.commit();
+                            tx.commitAndForget();
                             return Uni.createFrom().item(true);
                         })
                         .onFailure().recoverWithUni(t -> {
-                            tx.rollback();
+                            tx.commitAndForget();
                             return Uni.createFrom().item(false);
                         })
                 );
@@ -95,10 +95,8 @@ public class Person {
                             tx.commitAndForget();
                             return Uni.createFrom().item(results.iterator().next().getLong("id"));
                         })
-                        .onFailure().recoverWithUni(t -> {
-                            tx.rollbackAndForget();
-                            return Uni.createFrom().nullItem();
-                        }));
+                        .onFailure().invoke(t -> tx.rollbackAndForget())
+                );
     }
 
 }
