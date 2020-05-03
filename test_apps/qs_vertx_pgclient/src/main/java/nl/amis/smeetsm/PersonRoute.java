@@ -40,7 +40,7 @@ public class PersonRoute {
             Person.findById(client, Long.valueOf(id.get()))
                     .subscribe()
                     .with(person -> ex.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json").setStatusCode(200).end(JsonObject.mapFrom(person).toString()),
-                            failure -> ex.response().setStatusCode(500).end(failure.getMessage())
+                            failure -> ex.response().setStatusCode(404).end(failure.getMessage())
                     );
         } else {
             ex.response().setStatusCode(400).end();

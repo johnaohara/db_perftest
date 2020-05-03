@@ -25,7 +25,13 @@ public class Person {
     public static Uni<Person> findById(PgPool client, Long id) {
         return client.preparedQuery("SELECT id, first_name, last_name  FROM person WHERE id = $1", Tuple.of(id))
                 .onItem()
-                .produceUni( rows -> Uni.createFrom().item(from(rows.iterator().next())));
+                .produceUni( rows -> {
+                    if (rows.iterator().hasNext()) {
+                        return Uni.createFrom().item(from(rows.iterator().next()));
+                    } else {
+                        return Uni.createFrom().failure(new Throwable("Person not found with id: ".concat(id.toString())));
+                    }
+                });
 
 
     }
