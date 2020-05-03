@@ -53,7 +53,7 @@ public class PersonRoute {
                 .mapTo(Person.class)
                 .save(client)
                 .subscribe()
-                .with(id -> ex.response().setStatusCode(201).end(URI.create("/people/" + id).toString()),
+                .with(id -> ex.response().putHeader("Location", URI.create("/people/" + id).toString()).setStatusCode(201).end(),
                         failure -> ex.response().setStatusCode(500).end(failure.getMessage())
                 );
     }
