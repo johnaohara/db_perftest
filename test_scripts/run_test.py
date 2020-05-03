@@ -14,8 +14,8 @@ wait_after_primer = 1
 wait_to_start = 10
 wait_after_kill = 2
 now = datetime.now()
-javacmd = '/usr/lib/jvm/java-11-openjdk-amd64/bin/java'
-wrkcmd = '/home/maarten/projects/wrk/wrk'
+javacmd = '/home/johara/.sdkman/candidates/java/11.0.6-open/bin/java'
+wrkcmd = '/home/johara/bin/wrk'
 wrktimeout = '20s'
 
 datestring = now.strftime("%Y%m%d_%H%M%S")
@@ -40,12 +40,29 @@ fh.setFormatter(formatter)
 logger.addHandler(ch)
 logger.addHandler(fh)
 
-cpuset_conf1 = ['3', '3,5', '3,5,7,9']
-cpuset_conf2 = ['2', '2,4', '2,4,6,8']
+cpuset_conf1 = ['0']
+cpuset_conf2 = ['1,2']
 pool_conf = ['5', '20', '100']
 concurrency_conf = ['1', '2', '4', '10', '25', '50', '75', '100']
 
 # JAR files to test with
+jarfiles_base = [
+    # {'filename': '/home/johara/Work/quarkus_comparisons/db_perftest/test_apps/qs_vertx_pgclient/target/qs_vertx_pgclient-1.0-SNAPSHOT-runner.jar',
+    #               'pool_flags' : ' -Dquarkus.datasource.max-size={POOL_SIZE} -Dquarkus.datasource.min-size={POOL_SIZE} ',
+    #               'description': 'Quarkus Vert.x web PgClient ', 'driver': 'pgClint', 'pool': 'pgClint',
+    #               'servlet_engine': 'vertx-web', 'framework': 'Quarkus Vertx-web', 'asyncservice': 'yes',
+    #               'pool_used': 'yes',
+    #               'asyncdriver': 'yes'}
+    # ,
+    {'filename': '/home/johara/Work/quarkus_comparisons/db_perftest/test_apps/sb_webflux_r2dbcpool_r2dbc/target/sb_webflux_r2dbcpool_r2dbc-0.0.1-SNAPSHOT.jar',
+     'pool_flags' : ' -Dspring.r2dbc.max-size={POOL_SIZE} ',
+                      'description': 'Spring Boot WebFlux R2DBC pool R2DBC', 'driver': 'r2dbc', 'pool': 'r2dbc',
+                      'servlet_engine': 'netty', 'framework': 'Spring Boot Data', 'asyncservice': 'yes', 'pool_used': 'yes',
+                      'asyncdriver': 'yes'}
+]
+
+
+
 jarfiles_base = [{'filename': 'sb_jparest_hikari_jdbc-0.0.1-SNAPSHOT', 'description': 'Spring Boot JPA REST JDBC',
                   'driver': 'jdbc', 'pool': 'hikari', 'servlet_engine': 'tomcat', 'framework': 'JPA Data REST',
                   'asyncservice': 'no', 'pool_used': 'yes', 'asyncdriver': 'no'},
@@ -61,13 +78,18 @@ jarfiles_base = [{'filename': 'sb_jparest_hikari_jdbc-0.0.1-SNAPSHOT', 'descript
                   'servlet_engine': 'tomcat', 'framework': 'RxJava', 'asyncservice': 'yes', 'pool_used': 'yes',
                   'asyncdriver': 'no'},
                  {'filename': 'qs_resteasy_r2dbcpool_r2dbc-1.0-SNAPSHOT',
-                  'description': 'Quarkus RestEasy R2DBC', 'driver': 'r2dbc', 'pool': 'r2dbc',
+                  'description': 'Quarkus RestEasy R2DBC', 'driver': 'pgClint', 'pool': 'pgClint',
                   'servlet_engine': 'resteasy', 'framework': 'Quarkus RestEasy', 'asyncservice': 'yes',
                   'pool_used': 'yes',
                   'asyncdriver': 'yes'},
                  {'filename': 'qs_resteasy_agroalpool_jdbc-1.0-SNAPSHOT',
                   'description': 'Quarkus RestEasy JDBC', 'driver': 'jdbc', 'pool': 'agroal',
                   'servlet_engine': 'resteasy', 'framework': 'Quarkus RestEasy', 'asyncservice': 'no',
+                  'pool_used': 'yes',
+                  'asyncdriver': 'no'},
+                 {'filename': 'qs_vertx_pgclient-1.0-SNAPSHOT',
+                  'description': 'Quarkus Vert.x web PgClient ', 'driver': 'pgClint', 'pool': 'pgClint',
+                  'servlet_engine': 'vertx-web', 'framework': 'Quarkus Vertx-web', 'asyncservice': 'yes',
                   'pool_used': 'yes',
                   'asyncdriver': 'no'},
                  {'filename': 'sb_webflux_r2dbcpool_r2dbc-0.0.1-SNAPSHOT',
@@ -79,7 +101,6 @@ jarfiles = []
 for jarfile in jarfiles_base:
     for pool in pool_conf:
         tmpjar = copy.deepcopy(jarfile)
-        tmpjar["filename"] = jarfile["filename"] + "_" + str(pool) + ".jar"
         tmpjar["poolsize"] = str(pool)
         jarfiles.append(tmpjar)
 
@@ -91,8 +112,8 @@ def check_prereqs():
             resval = False
     return resval
 
-def build_jvmcmd(jar):
-    return javacmd + ' ' + '-jar ' + jar
+def build_jvmcmd(jar, pool_flags, poolsize):
+    return javacmd + pool_flags.replace("{POOL_SIZE}", poolsize) + '-jar ' + jar
 
 
 def get_cpuusage(pid):
@@ -143,7 +164,7 @@ def exec_all_tests():
         the_file.write(
             'description,driver,asyncservice,pool_used,asyncdriver,servlet_engine,framework,cpus_load,cpus_service,concurrency,poolsize,lat_avg,lat_stdev,lat_max,req_avg,req_stdev,req_max,tot_requests,tot_duration,read,err_connect,err_read,err_write,err_timeout,req_sec_tot,read_tot,user_cpu,kern_cpu,user_child_cpu,kern_child_cpu,mem_kb_uss,cpu,mem_kb_pss,mem_kb_rss,duration\n')
     for jarfile in jarfiles:
-        jvmcmd = build_jvmcmd(jarfile.get('filename'));
+        jvmcmd = build_jvmcmd(jarfile.get('filename'), jarfile.get('pool_flags'), jarfile.get('poolsize'));
         logger.info('Processing command: ' + jvmcmd)
         for cpuset_load in cpuset_conf1:
             cpunum_load = str(get_cpu_num(cpuset_load))
