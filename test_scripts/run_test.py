@@ -42,7 +42,7 @@ logger.addHandler(fh)
 
 cpuset_conf1 = ['3,5,7,9']
 cpuset_conf2 = ['2,4,6,8']
-concurrency_conf = ['4','50','100','150','200','250','300','350','400','450','500','600','700','800','900','1000']
+concurrency_conf = ['4','50','100','150','200','250','300','350','400']
 
 # JAR files to test with
 jarfiles = [
